@@ -49,22 +49,10 @@ vue-cluster create myApp
 
 1) Install your database onto your system.
 2) Fill out the config.json and database.json in your 'myApp' folder.
-3) Create the database in mysql (or whatever database you are using)
-```mysql
-create database vue_cluster
-```
-4) 
-```bash
-npm install -g db-migrate
-```
-5)
-```bash
-db-migrate up
-```
-6)
-```bash
-$ npm start
-```
+3) Create the database in mysql (or whatever database you are using) (In mysql -->) ```create database vue_cluster;```
+4) ```npm install -g db-migrate```
+5)```db-migrate up```
+6)```$ npm start```
 7) Navigate to ```localhost:3000``` in your browser, login with the parameters you specified in the config file and you're done!
 
 ## Structure

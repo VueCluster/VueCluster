@@ -1,7 +1,7 @@
 {
   "name": "vue-cluster-default",
-  "description": "An example app for SC-CRUD-MySQL",
-  "version": "0.1.0",
+  "description": "An example app for VueCluster",
+  "version": "1.0.0",
   "bin":{
     "vue-cluster":"bin/cli.js"
   },
@@ -10,13 +10,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/happilymarrieddad/vue-cluster.git"
+    "url": "git+https://github.com/VueCluster/VueCluster.git"
   },
   "author": "Nick Kotenberg",
   "contributors": [
     {
       "name": "Nick Kotenberg",
-      "email": "happilymarrieddad@gmail.com"
+      "email": "vuecluster@gmail.com"
     }
   ],
   "scripts": {
@@ -67,6 +67,6 @@
     "scalable"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/happilymarrieddad/vue-cluster#readme",
+  "homepage": "https://github.com/VueCluster/VueCluster#readme",
   "readmeFilename": "README.md"
 }
