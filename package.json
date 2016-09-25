@@ -3,9 +3,23 @@
   "version": "0.0.1",
   "description": "Vue2 'server-less' Clustered framework with allows for UNLIMITED scaling",
   "main": "index.js",
-  "bin": {
-    "vue-cluster": "cli.js"
+  "bin":{
+    "vue-cluster":"bin/cli.js"
   },
+  "bugs":{
+    "url":""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VueCluster/VueCluster.git"
+  },
+  "author": "Nick Kotenberg",
+  "contributors": [
+    {
+      "name": "Nick Kotenberg",
+      "email": "vuecluster@gmail.com"
+    }
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
