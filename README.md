@@ -18,10 +18,15 @@ VueCluster provides so many features to speed up your app, it's hard to put all 
 ## Stack Includes
 
 1) Vue2 (http://rc.vuejs.org/api/)
+
 2) SocketCluster (http://socketcluster.io/#!/)
+
 3) SC-CRUD-MySQL (https://github.com/happilymarrieddad/sc-crud-mysql)
+
 4) Vue2-router (http://router.vuejs.org/en/index.html)
+
 5) Bootstrap 4 (http://v4-alpha.getbootstrap.com/)
+
 6) Puglatizer: Client-side templating engine based on Pug (formally Jade) (https://www.npmjs.com/package/puglatizer)
 
 ## Main Contributors
