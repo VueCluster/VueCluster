@@ -1,0 +1,10 @@
+{
+    "dev": {
+	    "host": "localhost",
+	    "user": "root",
+	    "password" : "",
+	    "database": "sc-crud-vue2-example",
+	    "driver": "mysql",
+	    "multipleStatements": true
+  	}
+}

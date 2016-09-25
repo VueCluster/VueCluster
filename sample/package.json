@@ -1,0 +1,72 @@
+{
+  "name": "vue-cluster-default",
+  "description": "An example app for SC-CRUD-MySQL",
+  "version": "0.1.0",
+  "bin":{
+    "vue-cluster":"bin/cli.js"
+  },
+  "bugs":{
+    "url":""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/happilymarrieddad/vue-cluster.git"
+  },
+  "author": "Nick Kotenberg",
+  "contributors": [
+    {
+      "name": "Nick Kotenberg",
+      "email": "happilymarrieddad@gmail.com"
+    }
+  ],
+  "scripts": {
+    "start": "npm run build && node server.js",
+    "build": "npm run build-templates && npm run build-webpack",
+    "build-templates": "puglatizer -d templates -o public/js/bin/templates.js",
+    "build-webpack": "webpack"
+  },
+  "dependencies": {
+    "async": "^2.0.1",
+    "babel-core": "^6.14.0",
+    "babel-loader": "^6.2.5",
+    "babel-plugin-transform-runtime": "^6.15.0",
+    "babel-preset-es2015": "^6.14.0",
+    "babel-runtime": "^6.11.6",
+    "bcrypt": "^0.8.7",
+    "connect": "^3.5.0",
+    "css-loader": "^0.25.0",
+    "express": "^4.14.0",
+    "minimist": "^1.2.0",
+    "moment": "^2.15.0",
+    "mysql": "^2.11.1",
+    "pug": "^2.0.0-beta6",
+    "puglatizer": "^1.1.3",
+    "sc-cluster-broker-client": "1.x.x",
+    "sc-crud-mysql": "^0.3.3",
+    "sc-redis": "^0.1.0",
+    "serve-static": "^1.11.1",
+    "socketcluster": "5.x.x",
+    "socketcluster-client": "5.x.x",
+    "validate.js": "^0.10.0",
+    "vue": "^2.0.0-rc.6",
+    "vue-hot-reload-api": "^2.0.6",
+    "vue-html-loader": "^1.2.3",
+    "vue-loader": "^8.5.2",
+    "vue-router": "^2.0.0-rc.5",
+    "vue-strap": "^1.1.23",
+    "vue-style-loader": "^1.0.0",
+    "vueify": "^8.5.2",
+    "webpack": "^1.13.2",
+    "webpack-dev-server": "^1.16.1"
+  },
+  "keywords": [
+    "websocket",
+    "server",
+    "realtime",
+    "cluster",
+    "scalable"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/happilymarrieddad/vue-cluster#readme",
+  "readmeFilename": "README.md"
+}

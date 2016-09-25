@@ -1,0 +1,45 @@
+doctype html
+html(lang='en')
+	head
+		title Vue SC Crud Mysql
+
+		meta(charset='utf-8')
+		meta(name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no')
+		meta(http-equiv='x-ua-compatible',content='ie=edge')
+		
+		link(rel='stylesheet',href='/css/bootstrap-4.min.css')
+
+	//- Vue no longer mounts to the body
+	body(style='display:none')
+
+		div#app(v-cloak)
+
+			img(v-show='loading',src='/images/loading.gif',alt='Loading Image',style='position: absolute; margin:auto; left:0; right:0; top:0; bottom:0')
+
+			nav.navbar.navbar-full.navbar-dark.bg-inverse.fixed-top(v-show='authenticated && !loading')
+
+				ul.nav.navbar-nav.pull-md-left
+					li.nav-item
+						router-link.nav-link(to='/dashboard') Dashboard
+
+				ul.nav.navbar-nav.pull-md-right
+					li.nav-item.btn-group
+						a.dropdown-toggle.nav-link(data-toggle="dropdown") {{ first }} {{ last }}
+						div.dropdown-menu
+							router-link.dropdown-item(to='/session/destroy') Logout
+
+			div.container-fluid(v-show='!loading')
+				div.row
+					div.col-md-12
+						router-view
+
+			input#address(v-show='showSocketData',value=address)
+			input#port(v-show='showSocketData',value=port)
+
+		script(src='/js/lib/jquery.min.js')
+		script(src='/js/lib/tether.min.js')
+		script(src='/js/lib/bootstrap-4.min.js')
+		script(src='/js/bin/templates.js')
+		script(src='/js/lib/alertify.min.js')
+
+		script(src='/js/bin/app.bundle.js')

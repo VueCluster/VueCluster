@@ -1,0 +1,22 @@
+{
+	"name":"Test APP",
+	"port":3000,
+	"default_user":{
+		"first":"Nick",
+		"last":"Kotenberg",
+		"email":"nick@mail.com",
+		"password":"changeme",
+		"type_id":1,
+		"visible":1
+	},
+	"db":{
+		"host":"localhost",
+		"user":"root",
+		"password":"",
+		"database":"sc-crud-vue2-example"
+	},
+	"redis":{
+		"host":"localhost",
+		"port":6379
+	}
+}

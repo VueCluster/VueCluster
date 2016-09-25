@@ -1,0 +1,29 @@
+{
+  "name": "vue-cluster",
+  "version": "0.0.1",
+  "description": "Vue2 'server-less' Clustered framework with allows for UNLIMITED scaling",
+  "main": "index.js",
+  "bin": {
+    "vue-cluster": "cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "vue2",
+    "vue-router2",
+    "cluster",
+    "sockets",
+    "nodejs"
+  ],
+  "author": "Nick Kotenberg",
+  "license": "MIT",
+  "dependencies": {
+    "colors": "^1.1.2",
+    "commander": "^2.9.0",
+    "fs-extra": "^0.30.0",
+    "inquirer": "^1.1.3",
+    "minimist": "^1.2.0"
+  },
+  "preferGlobal":true
+}
