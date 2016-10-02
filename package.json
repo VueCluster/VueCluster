@@ -1,6 +1,6 @@
 {
   "name": "vue-cluster",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Vue2 'server-less' Clustered framework with allows for UNLIMITED scaling",
   "main": "index.js",
   "bin": {
