@@ -1,0 +1,11 @@
+nav.navbar.navbar-full.navbar-dark.bg-inverse.fixed-top(v-show='authenticated && !loading')
+	
+	ul.nav.navbar-nav.pull-md-left
+		li.nav-item
+			router-link.nav-link(to='/dashboard') Dashboard
+
+	ul.nav.navbar-nav.pull-md-right
+		li.nav-item.btn-group
+			a.dropdown-toggle.nav-link(data-toggle="dropdown") {{ first }} {{ last }}
+			div.dropdown-menu
+				router-link.dropdown-item(to='/session/destroy') Logout

@@ -1,8 +1,8 @@
 <script>
 	export default {
 		template:puglatizer.session.index({}),
-		beforeRouteEnter(route,redirect,next) { next(vm => {}) },
-		beforeRouteLeave(route,redirect,next) { next() }
+		beforeRouteEnter(to, from, next) { next(vm => {}) },
+		beforeRouteLeave(to, from, next) { next() }
 	}
 </script>
 
