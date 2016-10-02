@@ -3,6 +3,8 @@ VueCluster
 
 Complete documentation available at: http://vue-cluster.com/
 
+### This is a project in it's initial stage. I could really use some feedback if anyone has some time. Thanks!
+
 ## Change log
 
 	- 0.0.1 The initial build for VueCluster. This is not something that should be used. It's more for testing for me. Thanks for taking the time to look and feel free to give me any feedback.
@@ -48,12 +50,19 @@ vue-cluster create myApp
 ## Usage
 
 1) Install your database onto your system.
+
 2) Fill out the config.json and database.json in your 'myApp' folder.
+
 3) Create the database in mysql (or whatever database you are using) (In mysql -->) ```create database vue_cluster;```
+
 4) ```npm install -g db-migrate```
-5)```db-migrate up```
-6)```$ npm start```
+
+5) ```db-migrate up```
+
+6) ```$ npm start```
+
 7) Navigate to ```localhost:3000``` in your browser, login with the parameters you specified in the config file and you're done!
+
 
 ## Structure
 

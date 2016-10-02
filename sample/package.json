@@ -1,7 +1,7 @@
 {
   "name": "vue-cluster-default",
   "description": "An example app for VueCluster",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "bin": {
     "vue-cluster": "bin/cli.js"
   },
