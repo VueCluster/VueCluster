@@ -2,11 +2,11 @@
   "name": "vue-cluster-default",
   "description": "An example app for VueCluster",
   "version": "1.0.0",
-  "bin":{
-    "vue-cluster":"bin/cli.js"
+  "bin": {
+    "vue-cluster": "bin/cli.js"
   },
-  "bugs":{
-    "url":""
+  "bugs": {
+    "url": ""
   },
   "repository": {
     "type": "git",
@@ -42,7 +42,7 @@
     "pug": "^2.0.0-beta6",
     "puglatizer": "^1.1.3",
     "sc-cluster-broker-client": "1.x.x",
-    "sc-crud-mysql": "^0.3.3",
+    "sc-crud-mysql": "^0.4.0",
     "sc-redis": "^0.1.0",
     "serve-static": "^1.11.1",
     "socketcluster": "5.x.x",
