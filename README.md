@@ -7,6 +7,8 @@ Complete documentation available at: http://vue-cluster.com/
 
 ## Change log
 
+	- 1.0.2 VueRouter 2 broke the build so I'm pushing up the change to fix it.
+
 	- 0.0.1 The initial build for VueCluster. This is not something that should be used. It's more for testing for me. Thanks for taking the time to look and feel free to give me any feedback.
 
 ## Introduction
