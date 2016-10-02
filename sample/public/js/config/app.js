@@ -14,17 +14,17 @@ const router = new VueRouter({
 	routes
 })
 
-router.beforeEach((route,redirect,next) => {
+router.beforeEach((to,from,next) => {
 	router.app.loading = true
-	if (route.meta.requiresAuth && !router.app.authenticated) {
+	if (to.meta.requiresAuth && !router.app.authenticated) {
 		router.app.loading = false
-		redirect('/session/create')
+		next('/session/create')
 	} else {
 		next()
 	}
 })
 
-router.afterEach(route => {
+router.afterEach((to,next) => {
 	setTimeout(function() {
 		router.app.loading = false
 	},100)

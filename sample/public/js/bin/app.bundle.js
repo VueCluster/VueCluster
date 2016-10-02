@@ -78,17 +78,17 @@
 		routes: _routes2.default
 	});
 
-	router.beforeEach(function (route, redirect, next) {
+	router.beforeEach(function (to, from, next) {
 		router.app.loading = true;
-		if (route.meta.requiresAuth && !router.app.authenticated) {
+		if (to.meta.requiresAuth && !router.app.authenticated) {
 			router.app.loading = false;
-			redirect('/session/create');
+			next('/session/create');
 		} else {
 			next();
 		}
 	});
 
-	router.afterEach(function (route) {
+	router.afterEach(function (to, next) {
 		setTimeout(function () {
 			router.app.loading = false;
 		}, 100);
@@ -197,8 +197,8 @@
 /* 1 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(global) {/*!
-	 * Vue.js v2.0.0-rc.7
+	/*!
+	 * Vue.js v2.0.1
 	 * (c) 2014-2016 Evan You
 	 * Released under the MIT License.
 	 */
@@ -256,7 +256,7 @@
 	/**
 	 * Remove an item from an array
 	 */
-	function remove (arr, item) {
+	function remove$1 (arr, item) {
 	  if (arr.length) {
 	    var index = arr.indexOf(item)
 	    if (index > -1) {
@@ -320,7 +320,7 @@
 	/**
 	 * Simple bind, faster than native
 	 */
-	function bind (fn, ctx) {
+	function bind$1 (fn, ctx) {
 	  function boundFn (a) {
 	    var l = arguments.length
 	    return l
@@ -563,6 +563,7 @@
 	}
 
 	/*  */
+	/* globals MutationObserver */
 
 	// can we use __proto__?
 	var hasProto = '__proto__' in {}
@@ -577,14 +578,18 @@
 	var isIE9 = UA && UA.indexOf('msie 9.0') > 0
 	var isEdge = UA && UA.indexOf('edge/') > 0
 	var isAndroid = UA && UA.indexOf('android') > 0
+	var isIOS = UA && /iphone|ipad|ipod|ios/.test(UA)
 
 	// detect devtools
 	var devtools = inBrowser && window.__VUE_DEVTOOLS_GLOBAL_HOOK__
 
+	/* istanbul ignore next */
+	function isNative (Ctor) {
+	  return /native code/.test(Ctor.toString())
+	}
+
 	/**
-	 * Defer a task to execute it asynchronously. Ideally this
-	 * should be executed as a microtask, but MutationObserver is unreliable
-	 * in iOS UIWebView so we use a setImmediate shim and fallback to setTimeout.
+	 * Defer a task to execute it asynchronously.
 	 */
 	var nextTick = (function () {
 	  var callbacks = []
@@ -594,28 +599,51 @@
 	  function nextTickHandler () {
 	    pending = false
 	    var copies = callbacks.slice(0)
-	    callbacks = []
+	    callbacks.length = 0
 	    for (var i = 0; i < copies.length; i++) {
 	      copies[i]()
 	    }
 	  }
 
-	  /* istanbul ignore else */
-	  if (inBrowser && window.postMessage &&
-	    !window.importScripts && // not in WebWorker
-	    !(isAndroid && !window.requestAnimationFrame) // not in Android <= 4.3
-	  ) {
-	    var NEXT_TICK_TOKEN = '__vue__nextTick__'
-	    window.addEventListener('message', function (e) {
-	      if (e.source === window && e.data === NEXT_TICK_TOKEN) {
-	        nextTickHandler()
-	      }
+	  // the nextTick behavior leverages the microtask queue, which can be accessed
+	  // via either native Promise.then or MutationObserver.
+	  // MutationObserver has wider support, however it is seriously bugged in
+	  // UIWebView in iOS >= 9.3.3 when triggered in touch event handlers. It
+	  // completely stops working after triggering a few times... so, if native
+	  // Promise is available, we will use it:
+	  /* istanbul ignore if */
+	  if (typeof Promise !== 'undefined' && isNative(Promise)) {
+	    var p = Promise.resolve()
+	    timerFunc = function () {
+	      p.then(nextTickHandler)
+	      // in problematic UIWebViews, Promise.then doesn't completely break, but
+	      // it can get stuck in a weird state where callbacks are pushed into the
+	      // microtask queue but the queue isn't being flushed, until the browser
+	      // needs to do some other work, e.g. handle a timer. Therefore we can
+	      // "force" the microtask queue to be flushed by adding an empty timer.
+	      if (isIOS) { setTimeout(noop) }
+	    }
+	  } else if (typeof MutationObserver !== 'undefined' && (
+	    isNative(MutationObserver) ||
+	    // PhantomJS and iOS 7.x
+	    MutationObserver.toString() === '[object MutationObserverConstructor]'
+	  )) {
+	    // use MutationObserver where native Promise is not available,
+	    // e.g. PhantomJS IE11, iOS7, Android 4.4
+	    var counter = 1
+	    var observer = new MutationObserver(nextTickHandler)
+	    var textNode = document.createTextNode(String(counter))
+	    observer.observe(textNode, {
+	      characterData: true
 	    })
 	    timerFunc = function () {
-	      window.postMessage(NEXT_TICK_TOKEN, '*')
+	      counter = (counter + 1) % 2
+	      textNode.data = String(counter)
 	    }
 	  } else {
-	    timerFunc = (typeof global !== 'undefined' && global.setImmediate) || setTimeout
+	    // fallback to setTimeout
+	    /* istanbul ignore next */
+	    timerFunc = setTimeout
 	  }
 
 	  return function queueNextTick (cb, ctx) {
@@ -623,15 +651,16 @@
 	      ? function () { cb.call(ctx) }
 	      : cb
 	    callbacks.push(func)
-	    if (pending) { return }
-	    pending = true
-	    timerFunc(nextTickHandler, 0)
+	    if (!pending) {
+	      pending = true
+	      timerFunc(nextTickHandler, 0)
+	    }
 	  }
 	})()
 
 	var _Set
 	/* istanbul ignore if */
-	if (typeof Set !== 'undefined' && /native code/.test(Set.toString())) {
+	if (typeof Set !== 'undefined' && isNative(Set)) {
 	  // use native Set when available.
 	  _Set = Set
 	} else {
@@ -658,8 +687,9 @@
 
 	var hasProxy;
 	var proxyHandlers;
-	var initProxy;
-	if (true) {
+	var initProxy
+
+	{
 	  var allowedGlobals = makeMap(
 	    'Infinity,undefined,NaN,isFinite,isNaN,' +
 	    'parseFloat,parseInt,decodeURI,decodeURIComponent,encodeURI,encodeURIComponent,' +
@@ -715,7 +745,7 @@
 	};
 
 	Dep.prototype.removeSub = function removeSub (sub) {
-	  remove(this.subs, sub)
+	  remove$1(this.subs, sub)
 	};
 
 	Dep.prototype.depend = function depend () {
@@ -751,7 +781,7 @@
 
 
 	var queue = []
-	var has = {}
+	var has$1 = {}
 	var circular = {}
 	var waiting = false
 	var flushing = false
@@ -762,8 +792,8 @@
 	 */
 	function resetSchedulerState () {
 	  queue.length = 0
-	  has = {}
-	  if (true) {
+	  has$1 = {}
+	  {
 	    circular = {}
 	  }
 	  waiting = flushing = false
@@ -790,10 +820,10 @@
 	  for (index = 0; index < queue.length; index++) {
 	    var watcher = queue[index]
 	    var id = watcher.id
-	    has[id] = null
+	    has$1[id] = null
 	    watcher.run()
 	    // in dev build, check and stop circular updates.
-	    if ("development" !== 'production' && has[id] != null) {
+	    if ("development" !== 'production' && has$1[id] != null) {
 	      circular[id] = (circular[id] || 0) + 1
 	      if (circular[id] > config._maxUpdateCount) {
 	        warn(
@@ -825,8 +855,8 @@
 	 */
 	function queueWatcher (watcher) {
 	  var id = watcher.id
-	  if (has[id] == null) {
-	    has[id] = true
+	  if (has$1[id] == null) {
+	    has$1[id] = true
 	    if (!flushing) {
 	      queue.push(watcher)
 	    } else {
@@ -1040,7 +1070,7 @@
 	    // if the vm is being destroyed or is performing a v-for
 	    // re-render (the watcher list is then filtered by v-for).
 	    if (!this.vm._isBeingDestroyed && !this.vm._vForRemoving) {
-	      remove(this.vm._watchers, this)
+	      remove$1(this.vm._watchers, this)
 	    }
 	    var i = this.deps.length
 	    while (i--) {
@@ -1090,12 +1120,7 @@
 	 */
 
 	var arrayProto = Array.prototype
-	var arrayMethods = Object.create(arrayProto)
-
-	/**
-	 * Intercept mutating methods and emit events
-	 */
-	;[
+	var arrayMethods = Object.create(arrayProto);[
 	  'push',
 	  'pop',
 	  'shift',
@@ -1183,7 +1208,7 @@
 	Observer.prototype.walk = function walk (obj) {
 	  var keys = Object.keys(obj)
 	  for (var i = 0; i < keys.length; i++) {
-	    defineReactive(obj, keys[i], obj[keys[i]])
+	    defineReactive$$1(obj, keys[i], obj[keys[i]])
 	  }
 	};
 
@@ -1248,7 +1273,7 @@
 	/**
 	 * Define a reactive property on an Object.
 	 */
-	function defineReactive (
+	function defineReactive$$1 (
 	  obj,
 	  key,
 	  val,
@@ -1330,7 +1355,7 @@
 	    obj[key] = val
 	    return
 	  }
-	  defineReactive(ob.value, key, val)
+	  defineReactive$$1(ob.value, key, val)
 	  ob.dep.notify()
 	  return val
 	}
@@ -1379,8 +1404,8 @@
 	    var loop = function ( i ) {
 	      var key = keys[i]
 	      /* istanbul ignore else */
-	      if (true) {
-	        defineReactive(vm, key, validateProp(key, props, propsData, vm), function () {
+	      {
+	        defineReactive$$1(vm, key, validateProp(key, props, propsData, vm), function () {
 	          if (vm.$parent && !observerState.isSettingProps) {
 	            warn(
 	              "Avoid mutating a prop directly since the value will be " +
@@ -1391,7 +1416,7 @@
 	            )
 	          }
 	        })
-	      } else {}
+	      }
 	    };
 
 	    for (var i = 0; i < keys.length; i++) loop( i );
@@ -1450,10 +1475,10 @@
 	        computedSharedDefinition.get = userDef.get
 	          ? userDef.cache !== false
 	            ? makeComputedGetter(userDef.get, vm)
-	            : bind(userDef.get, vm)
+	            : bind$1(userDef.get, vm)
 	          : noop
 	        computedSharedDefinition.set = userDef.set
-	          ? bind(userDef.set, vm)
+	          ? bind$1(userDef.set, vm)
 	          : noop
 	      }
 	      Object.defineProperty(vm, key, computedSharedDefinition)
@@ -1481,8 +1506,8 @@
 	  if (methods) {
 	    for (var key in methods) {
 	      if (methods[key] != null) {
-	        vm[key] = bind(methods[key], vm)
-	      } else if (true) {
+	        vm[key] = bind$1(methods[key], vm)
+	      } else {
 	        warn(("Method \"" + key + "\" is undefined in options."), vm)
 	      }
 	    }
@@ -1525,7 +1550,7 @@
 	  dataDef.get = function () {
 	    return this._data
 	  }
-	  if (true) {
+	  {
 	    dataDef.set = function (newData) {
 	      warn(
 	        'Avoid replacing instance root $data. ' +
@@ -1672,7 +1697,7 @@
 	            applyNS(c, ns)
 	          }
 	          // default key for nested array children (likely generated by v-for)
-	          if (c.key == null && nestedIndex != null) {
+	          if (c.tag && c.key == null && nestedIndex != null) {
 	            c.key = "__vlist_" + nestedIndex + "_" + i + "__"
 	          }
 	          res.push(c)
@@ -1702,19 +1727,19 @@
 	  return children && children.filter(function (c) { return c && c.componentOptions; })[0]
 	}
 
-	function mergeVNodeHook (def, key, hook) {
-	  var oldHook = def[key]
+	function mergeVNodeHook (def$$1, key, hook) {
+	  var oldHook = def$$1[key]
 	  if (oldHook) {
-	    var injectedHash = def.__injected || (def.__injected = {})
+	    var injectedHash = def$$1.__injected || (def$$1.__injected = {})
 	    if (!injectedHash[key]) {
 	      injectedHash[key] = true
-	      def[key] = function () {
+	      def$$1[key] = function () {
 	        oldHook.apply(this, arguments)
 	        hook.apply(this, arguments)
 	      }
 	    }
 	  } else {
-	    def[key] = hook
+	    def$$1[key] = hook
 	  }
 	}
 
@@ -1722,7 +1747,7 @@
 	  on,
 	  oldOn,
 	  add,
-	  remove
+	  remove$$1
 	) {
 	  var name, cur, old, fn, event, capture
 	  for (name in on) {
@@ -1760,7 +1785,7 @@
 	  for (name in oldOn) {
 	    if (!on[name]) {
 	      event = name.charAt(0) === '!' ? name.slice(1) : name
-	      remove(event, oldOn[name].invoker)
+	      remove$$1(event, oldOn[name].invoker)
 	    }
 	  }
 	}
@@ -1821,7 +1846,7 @@
 	    vm.$el = el
 	    if (!vm.$options.render) {
 	      vm.$options.render = emptyVNode
-	      if (true) {
+	      {
 	        /* istanbul ignore if */
 	        if (vm.$options.template) {
 	          warn(
@@ -1899,7 +1924,7 @@
 	    // update props
 	    if (propsData && vm.$options.props) {
 	      observerState.shouldConvert = false
-	      if (true) {
+	      {
 	        observerState.isSettingProps = true
 	      }
 	      var propKeys = vm.$options._propKeys || []
@@ -1908,7 +1933,7 @@
 	        vm[key] = validateProp(key, vm.$options.props, propsData, vm)
 	      }
 	      observerState.shouldConvert = true
-	      if (true) {
+	      {
 	        observerState.isSettingProps = false
 	      }
 	    }
@@ -1920,7 +1945,7 @@
 	    }
 	    // resolve slots + force update if has children
 	    if (hasChildren) {
-	      vm.$slots = resolveSlots(renderChildren)
+	      vm.$slots = resolveSlots(renderChildren, vm._renderContext)
 	      vm.$forceUpdate()
 	    }
 	  }
@@ -1942,7 +1967,7 @@
 	    // remove self from parent
 	    var parent = vm.$parent
 	    if (parent && !parent._isBeingDestroyed && !vm.$options.abstract) {
-	      remove(parent.$children, vm)
+	      remove$1(parent.$children, vm)
 	    }
 	    // teardown watchers
 	    if (vm._watcher) {
@@ -1981,7 +2006,7 @@
 
 	/*  */
 
-	var hooks = { init: init, prepatch: prepatch, insert: insert, destroy: destroy }
+	var hooks = { init: init, prepatch: prepatch, insert: insert, destroy: destroy$1 }
 	var hooksToMerge = Object.keys(hooks)
 
 	function createComponent (
@@ -1996,11 +2021,11 @@
 	  }
 
 	  if (isObject(Ctor)) {
-	    Ctor = Vue.extend(Ctor)
+	    Ctor = Vue$3.extend(Ctor)
 	  }
 
 	  if (typeof Ctor !== 'function') {
-	    if (true) {
+	    {
 	      warn(("Invalid Component definition: " + (String(Ctor))), context)
 	    }
 	    return
@@ -2075,13 +2100,15 @@
 	  }
 	  return Ctor.options.render.call(
 	    null,
-	    context.$createElement,
+	    // ensure the createElement function in functional components
+	    // gets a unique context - this is necessary for correct named slot check
+	    bind$1(createElement, { _self: Object.create(context) }),
 	    {
 	      props: props,
 	      data: data,
 	      parent: context,
 	      children: normalizeChildren(children),
-	      slots: function () { return resolveSlots(children); }
+	      slots: function () { return resolveSlots(children, context); }
 	    }
 	  )
 	}
@@ -2141,7 +2168,7 @@
 	  }
 	}
 
-	function destroy (vnode) {
+	function destroy$1 (vnode) {
 	  if (!vnode.child._isDestroyed) {
 	    if (!vnode.data.keepAlive) {
 	      vnode.child.$destroy()
@@ -2166,7 +2193,7 @@
 
 	    var resolve = function (res) {
 	      if (isObject(res)) {
-	        res = Vue.extend(res)
+	        res = Vue$3.extend(res)
 	      }
 	      // cache resolved
 	      factory.resolved = res
@@ -2336,10 +2363,11 @@
 	  vm.$vnode = null // the placeholder node in parent tree
 	  vm._vnode = null // the root of the child tree
 	  vm._staticTrees = null
-	  vm.$slots = resolveSlots(vm.$options._renderChildren)
+	  vm._renderContext = vm.$options._parentVnode && vm.$options._parentVnode.context
+	  vm.$slots = resolveSlots(vm.$options._renderChildren, vm._renderContext)
 	  // bind the public createElement fn to this instance
 	  // so that we get proper render context inside it.
-	  vm.$createElement = bind(createElement, vm)
+	  vm.$createElement = bind$1(createElement, vm)
 	  if (vm.$options.el) {
 	    vm.$mount(vm.$options.el)
 	  }
@@ -2375,7 +2403,7 @@
 	    try {
 	      vnode = render.call(vm._renderProxy, vm.$createElement)
 	    } catch (e) {
-	      if (true) {
+	      {
 	        warn(("Error when rendering " + (formatComponentName(vm)) + ":"))
 	      }
 	      /* istanbul ignore else */
@@ -2536,7 +2564,8 @@
 	}
 
 	function resolveSlots (
-	  renderChildren
+	  renderChildren,
+	  context
 	) {
 	  var slots = {}
 	  if (!renderChildren) {
@@ -2547,8 +2576,10 @@
 	  var name, child
 	  for (var i = 0, l = children.length; i < l; i++) {
 	    child = children[i]
-	    if (child.data && (name = child.data.slot)) {
-	      delete child.data.slot
+	    // named slots should only be respected if the vnode was rendered in the
+	    // same context.
+	    if (child.context === context &&
+	        child.data && (name = child.data.slot)) {
 	      var slot = (slots[name] || (slots[name] = []))
 	      if (child.tag === 'template') {
 	        slot.push.apply(slot, child.children)
@@ -2575,8 +2606,8 @@
 	  vm._events = Object.create(null)
 	  // init parent attached events
 	  var listeners = vm.$options._parentListeners
-	  var on = bind(vm.$on, vm)
-	  var off = bind(vm.$off, vm)
+	  var on = bind$1(vm.$on, vm)
+	  var off = bind$1(vm.$off, vm)
 	  vm._updateListeners = function (listeners, oldListeners) {
 	    updateListeners(listeners, oldListeners || {}, on, off)
 	  }
@@ -2587,8 +2618,7 @@
 
 	function eventsMixin (Vue) {
 	  Vue.prototype.$on = function (event, fn) {
-	    var vm = this
-	    ;(vm._events[event] || (vm._events[event] = [])).push(fn)
+	    var vm = this;(vm._events[event] || (vm._events[event] = [])).push(fn)
 	    return vm
 	  }
 
@@ -2671,9 +2701,9 @@
 	      )
 	    }
 	    /* istanbul ignore else */
-	    if (true) {
+	    {
 	      initProxy(vm)
-	    } else {}
+	    }
 	    // expose real self
 	    vm._self = vm
 	    initLifecycle(vm)
@@ -2718,20 +2748,24 @@
 	  }
 	}
 
-	function Vue (options) {
+	function Vue$3 (options) {
+	  if ("development" !== 'production' &&
+	    !(this instanceof Vue$3)) {
+	    warn('Vue is a constructor and should be called with the `new` keyword')
+	  }
 	  this._init(options)
 	}
 
-	initMixin(Vue)
-	stateMixin(Vue)
-	eventsMixin(Vue)
-	lifecycleMixin(Vue)
-	renderMixin(Vue)
+	initMixin(Vue$3)
+	stateMixin(Vue$3)
+	eventsMixin(Vue$3)
+	lifecycleMixin(Vue$3)
+	renderMixin(Vue$3)
 
 	var warn = noop
 	var formatComponentName
 
-	if (true) {
+	{
 	  var hasConsole = typeof console !== 'undefined'
 
 	  warn = function (msg, vm) {
@@ -2772,7 +2806,7 @@
 	/**
 	 * Options with restrictions
 	 */
-	if (true) {
+	{
 	  strats.el = strats.propsData = function (parent, child, vm, key) {
 	    if (!vm) {
 	      warn(
@@ -2970,7 +3004,7 @@
 	      }
 	      def = components[key]
 	      if (isPlainObject(def)) {
-	        components[key] = Vue.extend(def)
+	        components[key] = Vue$3.extend(def)
 	      }
 	    }
 	  }
@@ -2992,7 +3026,7 @@
 	      if (typeof val === 'string') {
 	        name = camelize(val)
 	        res[name] = { type: null }
-	      } else if (true) {
+	      } else {
 	        warn('props must be strings when using array syntax.')
 	      }
 	    }
@@ -3044,7 +3078,7 @@
 	  if (child.mixins) {
 	    for (var i = 0, l = child.mixins.length; i < l; i++) {
 	      var mixin = child.mixins[i]
-	      if (mixin.prototype instanceof Vue) {
+	      if (mixin.prototype instanceof Vue$3) {
 	        mixin = mixin.options
 	      }
 	      parent = mergeOptions(parent, mixin, vm)
@@ -3126,7 +3160,7 @@
 	    observe(value)
 	    observerState.shouldConvert = prevShouldConvert
 	  }
-	  if (true) {
+	  {
 	    assertProp(prop, key, value, vm, absent)
 	  }
 	  return value
@@ -3249,19 +3283,19 @@
 
 
 	var util = Object.freeze({
-		defineReactive: defineReactive,
+		defineReactive: defineReactive$$1,
 		_toString: _toString,
 		toNumber: toNumber,
 		makeMap: makeMap,
 		isBuiltInTag: isBuiltInTag,
-		remove: remove,
+		remove: remove$1,
 		hasOwn: hasOwn,
 		isPrimitive: isPrimitive,
 		cached: cached,
 		camelize: camelize,
 		capitalize: capitalize,
 		hyphenate: hyphenate,
-		bind: bind,
+		bind: bind$1,
 		toArray: toArray,
 		extend: extend,
 		isObject: isObject,
@@ -3282,6 +3316,7 @@
 		isIE9: isIE9,
 		isEdge: isEdge,
 		isAndroid: isAndroid,
+		isIOS: isIOS,
 		devtools: devtools,
 		nextTick: nextTick,
 		get _Set () { return _Set; },
@@ -3343,7 +3378,7 @@
 	      return extendOptions._Ctor
 	    }
 	    var name = extendOptions.name || Super.options.name
-	    if (true) {
+	    {
 	      if (!/^[a-zA-Z][\w-]*$/.test(name)) {
 	        warn(
 	          'Invalid component name: "' + name + '". Component names ' +
@@ -3402,7 +3437,7 @@
 	        return this.options[type + 's'][id]
 	      } else {
 	        /* istanbul ignore if */
-	        if (true) {
+	        {
 	          if (type === 'component' && config.isReservedTag(id)) {
 	            warn(
 	              'Do not use built-in or reserved HTML elements as component ' +
@@ -3469,7 +3504,7 @@
 	  // config
 	  var configDef = {}
 	  configDef.get = function () { return config; }
-	  if (true) {
+	  {
 	    configDef.set = function () {
 	      warn(
 	        'Do not replace the Vue.config object, set individual fields instead.'
@@ -3495,13 +3530,13 @@
 	  initAssetRegisters(Vue)
 	}
 
-	initGlobalAPI(Vue)
+	initGlobalAPI(Vue$3)
 
-	Object.defineProperty(Vue.prototype, '$isServer', {
+	Object.defineProperty(Vue$3.prototype, '$isServer', {
 	  get: function () { return config._isServer; }
 	})
 
-	Vue.version = '2.0.0-rc.7'
+	Vue$3.version = '2.0.1'
 
 	/*  */
 
@@ -3534,6 +3569,8 @@
 	  'spellcheck,src,srcdoc,srclang,srcset,start,step,style,summary,tabindex,' +
 	  'target,title,type,usemap,value,width,wrap'
 	)
+
+
 
 	var xlinkNS = 'http://www.w3.org/1999/xlink'
 
@@ -3793,19 +3830,19 @@
 
 
 	var nodeOps = Object.freeze({
-	  createElement: createElement$1,
-	  createElementNS: createElementNS,
-	  createTextNode: createTextNode,
-	  createComment: createComment,
-	  insertBefore: insertBefore,
-	  removeChild: removeChild,
-	  appendChild: appendChild,
-	  parentNode: parentNode,
-	  nextSibling: nextSibling,
-	  tagName: tagName,
-	  setTextContent: setTextContent,
-	  childNodes: childNodes,
-	  setAttribute: setAttribute
+		createElement: createElement$1,
+		createElementNS: createElementNS,
+		createTextNode: createTextNode,
+		createComment: createComment,
+		insertBefore: insertBefore,
+		removeChild: removeChild,
+		appendChild: appendChild,
+		parentNode: parentNode,
+		nextSibling: nextSibling,
+		tagName: tagName,
+		setTextContent: setTextContent,
+		childNodes: childNodes,
+		setAttribute: setAttribute
 	});
 
 	/*  */
@@ -3834,7 +3871,7 @@
 	  var refs = vm.$refs
 	  if (isRemoval) {
 	    if (Array.isArray(refs[key])) {
-	      remove(refs[key], ref)
+	      remove$1(refs[key], ref)
 	    } else if (refs[key] === ref) {
 	      refs[key] = undefined
 	    }
@@ -3915,13 +3952,13 @@
 	  }
 
 	  function createRmCb (childElm, listeners) {
-	    function remove () {
-	      if (--remove.listeners === 0) {
+	    function remove$$1 () {
+	      if (--remove$$1.listeners === 0) {
 	        removeElement(childElm)
 	      }
 	    }
-	    remove.listeners = listeners
-	    return remove
+	    remove$$1.listeners = listeners
+	    return remove$$1
 	  }
 
 	  function removeElement (el) {
@@ -3947,7 +3984,7 @@
 	    var children = vnode.children
 	    var tag = vnode.tag
 	    if (isDef(tag)) {
-	      if (true) {
+	      {
 	        if (
 	          !vnode.ns &&
 	          !(config.ignoredElements && config.ignoredElements.indexOf(tag) > -1) &&
@@ -4238,7 +4275,7 @@
 
 	  var bailed = false
 	  function hydrate (elm, vnode, insertedVnodeQueue) {
-	    if (true) {
+	    {
 	      if (!assertNodeMatch(elm, vnode)) {
 	        return false
 	      }
@@ -4329,7 +4366,7 @@
 	            if (hydrate(oldVnode, vnode, insertedVnodeQueue)) {
 	              invokeInsertHook(vnode, insertedVnodeQueue, true)
 	              return oldVnode
-	            } else if (true) {
+	            } else {
 	              warn(
 	                'The client-side rendered virtual DOM tree is not matching ' +
 	                'server-rendered content. This is likely caused by incorrect ' +
@@ -4677,7 +4714,7 @@
 	    cur = style[name]
 	    if (cur !== oldStyle[name]) {
 	      // ie9 setting to null has no effect, must use empty string
-	      el.style[normalize(name)] = cur || ''
+	      el.style[normalize(name)] = cur == null ? '' : cur
 	    }
 	  }
 	}
@@ -4770,7 +4807,7 @@
 
 	function removeTransitionClass (el, cls) {
 	  if (el._transitionClasses) {
-	    remove(el._transitionClasses, cls)
+	    remove$1(el._transitionClasses, cls)
 	  }
 	  removeClass(el, cls)
 	}
@@ -5069,20 +5106,20 @@
 	  }
 	}
 
-	function resolveTransition (def) {
-	  if (!def) {
+	function resolveTransition (def$$1) {
+	  if (!def$$1) {
 	    return
 	  }
 	  /* istanbul ignore else */
-	  if (typeof def === 'object') {
+	  if (typeof def$$1 === 'object') {
 	    var res = {}
-	    if (def.css !== false) {
-	      extend(res, autoCssTransition(def.name || 'v'))
+	    if (def$$1.css !== false) {
+	      extend(res, autoCssTransition(def$$1.name || 'v'))
 	    }
-	    extend(res, def)
+	    extend(res, def$$1)
 	    return res
-	  } else if (typeof def === 'string') {
-	    return autoCssTransition(def)
+	  } else if (typeof def$$1 === 'string') {
+	    return autoCssTransition(def$$1)
 	  }
 	}
 
@@ -5138,7 +5175,7 @@
 	// built-in modules have been applied.
 	var modules = platformModules.concat(baseModules)
 
-	var patch = createPatchFunction({ nodeOps: nodeOps, modules: modules })
+	var patch$1 = createPatchFunction({ nodeOps: nodeOps, modules: modules })
 
 	/**
 	 * Not type checking this file because flow doesn't like attaching
@@ -5160,7 +5197,7 @@
 
 	var model = {
 	  bind: function bind (el, binding, vnode) {
-	    if (true) {
+	    {
 	      if (!modelableTagRE.test(vnode.tag)) {
 	        warn(
 	          "v-model is not supported on element type: <" + (vnode.tag) + ">. " +
@@ -5174,9 +5211,11 @@
 	      setSelected(el, binding, vnode.context)
 	      /* istanbul ignore if */
 	      if (isIE || isEdge) {
-	        nextTick(function () {
+	        var cb = function () {
 	          setSelected(el, binding, vnode.context)
-	        })
+	        }
+	        nextTick(cb)
+	        setTimeout(cb, 0)
 	      }
 	    } else if (vnode.tag === 'textarea' || el.type === 'text') {
 	      if (!isAndroid) {
@@ -5518,7 +5557,7 @@
 	          children.push(c)
 	          map[c.key] = c
 	          ;(c.data || (c.data = {})).transition = transitionData
-	        } else if (true) {
+	        } else {
 	          var opts = c.componentOptions
 	          var name = opts
 	            ? (opts.Ctor.options.name || opts.tag)
@@ -5645,20 +5684,20 @@
 	/*  */
 
 	// install platform specific utils
-	Vue.config.isUnknownElement = isUnknownElement
-	Vue.config.isReservedTag = isReservedTag
-	Vue.config.getTagNamespace = getTagNamespace
-	Vue.config.mustUseProp = mustUseProp
+	Vue$3.config.isUnknownElement = isUnknownElement
+	Vue$3.config.isReservedTag = isReservedTag
+	Vue$3.config.getTagNamespace = getTagNamespace
+	Vue$3.config.mustUseProp = mustUseProp
 
 	// install platform runtime directives & components
-	extend(Vue.options.directives, platformDirectives)
-	extend(Vue.options.components, platformComponents)
+	extend(Vue$3.options.directives, platformDirectives)
+	extend(Vue$3.options.components, platformComponents)
 
 	// install platform patch function
-	Vue.prototype.__patch__ = config._isServer ? noop : patch
+	Vue$3.prototype.__patch__ = config._isServer ? noop : patch$1
 
 	// wrap mount
-	Vue.prototype.$mount = function (
+	Vue$3.prototype.$mount = function (
 	  el,
 	  hydrating
 	) {
@@ -5671,7 +5710,7 @@
 	setTimeout(function () {
 	  if (config.devtools) {
 	    if (devtools) {
-	      devtools.emit('init', Vue)
+	      devtools.emit('init', Vue$3)
 	    } else if (
 	      "development" !== 'production' &&
 	      inBrowser && /Chrome\/\d+/.test(window.navigator.userAgent)
@@ -5779,7 +5818,7 @@
 	function parseHTML (html, options) {
 	  var stack = []
 	  var expectHTML = options.expectHTML
-	  var isUnaryTag = options.isUnaryTag || no
+	  var isUnaryTag$$1 = options.isUnaryTag || no
 	  var isFromDOM = options.isFromDOM
 	  var index = 0
 	  var last, lastTag
@@ -5915,7 +5954,7 @@
 	      }
 	    }
 
-	    var unary = isUnaryTag(tagName) || tagName === 'html' && lastTag === 'head' || !!unarySlash
+	    var unary = isUnaryTag$$1(tagName) || tagName === 'html' && lastTag === 'head' || !!unarySlash
 
 	    var l = match.attrs.length
 	    var attrs = new Array(l)
@@ -6309,12 +6348,12 @@
 	        processFor(element)
 	        processIf(element)
 	        processOnce(element)
+	        processKey(element)
 
 	        // determine whether this is a plain element after
 	        // removing structural attributes
 	        element.plain = !element.key && !attrs.length
 
-	        processKey(element)
 	        processRef(element)
 	        processSlot(element)
 	        processComponent(element)
@@ -6325,7 +6364,7 @@
 	      }
 
 	      function checkRootConstraints (el) {
-	        if (true) {
+	        {
 	          if (el.tag === 'slot' || el.tag === 'template') {
 	            warn$1(
 	              "Cannot use <" + (el.tag) + "> as component root element because it may " +
@@ -6452,6 +6491,9 @@
 	function processKey (el) {
 	  var exp = getBindingAttr(el, 'key')
 	  if (exp) {
+	    if ("development" !== 'production' && el.tag === 'template') {
+	      warn$1("<template> cannot be keyed. Place the key on real elements instead.")
+	    }
 	    el.key = exp
 	  }
 	}
@@ -6503,7 +6545,7 @@
 	  var prev = findPrevElement(parent.children)
 	  if (prev && prev.if) {
 	    prev.elseBlock = el
-	  } else if (true) {
+	  } else {
 	    warn$1(
 	      ("v-else used on element <" + (el.tag) + "> without corresponding v-if.")
 	    )
@@ -6578,7 +6620,7 @@
 	      }
 	    } else {
 	      // literal attribute
-	      if (true) {
+	      {
 	        var expression = parseText(value, delimiters)
 	        if (expression) {
 	          warn$1(
@@ -6819,14 +6861,14 @@
 
 	/*  */
 
-	function bind$1 (el, dir) {
+	function bind$2 (el, dir) {
 	  el.wrapData = function (code) {
 	    return ("_b(" + code + "," + (dir.value) + (dir.modifiers && dir.modifiers.prop ? ',true' : '') + ")")
 	  }
 	}
 
 	var baseDirectives = {
-	  bind: bind$1,
+	  bind: bind$2,
 	  cloak: noop
 	}
 
@@ -6910,7 +6952,7 @@
 	  var iterator1 = el.iterator1 ? ("," + (el.iterator1)) : ''
 	  var iterator2 = el.iterator2 ? ("," + (el.iterator2)) : ''
 	  el.forProcessed = true // avoid recursion
-	  return "(" + exp + ")&&_l((" + exp + ")," +
+	  return "_l((" + exp + ")," +
 	    "function(" + alias + iterator1 + iterator2 + "){" +
 	      "return " + (genElement(el)) +
 	    '})'
@@ -7289,7 +7331,7 @@
 	  value,
 	  modifiers
 	) {
-	  if (true) {
+	  {
 	    if (el.tag === 'input' && el.attrsMap.value) {
 	      warn$3(
 	        "<" + (el.tag) + " v-model=\"" + value + "\" value=\"" + (el.attrsMap.value) + "\">:\n" +
@@ -7324,6 +7366,15 @@
 	  if (isNative && needCompositionGuard) {
 	    code = "if($event.target.composing)return;" + code
 	  }
+	  // inputs with type="file" are read only and setting the input's
+	  // value will throw an error.
+	  if ("development" !== 'production' &&
+	      type === 'file') {
+	    warn$3(
+	      "<" + (el.tag) + " v-model=\"" + value + "\" type=\"file\">:\n" +
+	      "File inputs are read only. Use a v-on:change listener instead."
+	    )
+	  }
 	  addProp(el, 'value', isNative ? ("_s(" + value + ")") : ("(" + value + ")"))
 	  addHandler(el, event, code, null, true)
 	  if (needCompositionGuard) {
@@ -7333,7 +7384,7 @@
 	}
 
 	function genSelect (el, value) {
-	  if (true) {
+	  {
 	    el.children.some(checkOptionWarning)
 	  }
 	  var code = value + "=Array.prototype.filter" +
@@ -7398,7 +7449,7 @@
 	  isPreTag: isPreTag
 	}
 
-	function compile (
+	function compile$$1 (
 	  template,
 	  options
 	) {
@@ -7416,7 +7467,7 @@
 	  var _warn = (options && options.warn) || warn
 	  // detect possible CSP restriction
 	  /* istanbul ignore if */
-	  if (true) {
+	  {
 	    try {
 	      new Function('return 1')
 	    } catch (e) {
@@ -7438,14 +7489,14 @@
 	    return cache[key]
 	  }
 	  var res = {}
-	  var compiled = compile(template, options)
+	  var compiled = compile$$1(template, options)
 	  res.render = makeFunction(compiled.render)
 	  var l = compiled.staticRenderFns.length
 	  res.staticRenderFns = new Array(l)
 	  for (var i = 0; i < l; i++) {
 	    res.staticRenderFns[i] = makeFunction(compiled.staticRenderFns[i])
 	  }
-	  if (true) {
+	  {
 	    if (res.render === noop || res.staticRenderFns.some(function (fn) { return fn === noop; })) {
 	      _warn(
 	        "failed to compile template:\n\n" + template + "\n\n" +
@@ -7473,8 +7524,8 @@
 	  return el && el.innerHTML
 	})
 
-	var mount = Vue.prototype.$mount
-	Vue.prototype.$mount = function (
+	var mount = Vue$3.prototype.$mount
+	Vue$3.prototype.$mount = function (
 	  el,
 	  hydrating
 	) {
@@ -7503,7 +7554,7 @@
 	        isFromDOM = true
 	        template = template.innerHTML
 	      } else {
-	        if (true) {
+	        {
 	          warn('invalid template option:' + template, this)
 	        }
 	        return this
@@ -7543,26 +7594,26 @@
 	  }
 	}
 
-	Vue.compile = compileToFunctions
+	Vue$3.compile = compileToFunctions
 
-	return Vue;
+	return Vue$3;
 
 	})));
-	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
 
 /***/ },
 /* 2 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
-	 * vue-router v2.0.0-rc.5
+	 * vue-router v2.0.0
 	 * (c) 2016 Evan You
 	 * @license MIT
 	 */
 	(function (global, factory) {
-		 true ? module.exports = factory() :
-		typeof define === 'function' && define.amd ? define(factory) :
-		(global.VueRouter = factory());
+	   true ? module.exports = factory() :
+	  typeof define === 'function' && define.amd ? define(factory) :
+	  (global.VueRouter = factory());
 	}(this, (function () { 'use strict';
 
 	var View = {
@@ -7617,13 +7668,13 @@
 	  }
 	}
 
-	/*       */
+	/*  */
 
 	function resolvePath (
-	  relative        ,
-	  base        ,
-	  append          
-	)         {
+	  relative,
+	  base,
+	  append
+	) {
 	  if (relative.charAt(0) === '/') {
 	    return relative
 	  }
@@ -7662,11 +7713,7 @@
 	  return stack.join('/')
 	}
 
-	function parsePath (path        )   
-	               
-	                
-	               
-	  {
+	function parsePath (path) {
 	  var hash = ''
 	  var query = ''
 
@@ -7689,34 +7736,34 @@
 	  }
 	}
 
-	function cleanPath (path        )         {
+	function cleanPath (path) {
 	  return path.replace(/\/\//g, '/')
 	}
 
-	/*       */
+	/*  */
 
-	function assert (condition     , message        ) {
+	function assert (condition, message) {
 	  if (!condition) {
 	    throw new Error(("[vue-router] " + message))
 	  }
 	}
 
-	function warn (condition     , message        ) {
+	function warn (condition, message) {
 	  if (!condition) {
 	    typeof console !== 'undefined' && console.warn(("[vue-router] " + message))
 	  }
 	}
 
-	/*       */
+	/*  */
 
 	var encode = encodeURIComponent
 	var decode = decodeURIComponent
 
 	function resolveQuery (
-	  query         ,
+	  query,
 	  extraQuery
-	)             {
-	  if ( extraQuery === void 0 ) extraQuery             = {};
+	) {
+	  if ( extraQuery === void 0 ) extraQuery = {};
 
 	  if (query) {
 	    var parsedQuery
@@ -7735,7 +7782,7 @@
 	  }
 	}
 
-	function parseQuery (query        )             {
+	function parseQuery (query) {
 	  var res = Object.create(null)
 
 	  query = query.trim().replace(/^(\?|#|&)/, '')
@@ -7763,7 +7810,7 @@
 	  return res
 	}
 
-	function stringifyQuery (obj            )         {
+	function stringifyQuery (obj) {
 	  var res = obj ? Object.keys(obj).sort().map(function (key) {
 	    var val = obj[key]
 
@@ -7795,14 +7842,14 @@
 	  return res ? ("?" + res) : ''
 	}
 
-	/*       */
+	/*  */
 
 	function createRoute (
-	  record              ,
-	  location          ,
-	  redirectedFrom           
-	)        {
-	  var route        = {
+	  record,
+	  location,
+	  redirectedFrom
+	) {
+	  var route = {
 	    name: location.name || (record && record.name),
 	    meta: (record && record.meta) || {},
 	    path: location.path || '/',
@@ -7818,7 +7865,12 @@
 	  return Object.freeze(route)
 	}
 
-	function formatMatch (record              )                     {
+	// the starting route that represents the initial state
+	var START = createRoute(null, {
+	  path: '/'
+	})
+
+	function formatMatch (record) {
 	  var res = []
 	  while (record) {
 	    res.unshift(record)
@@ -7836,8 +7888,10 @@
 	}
 
 	var trailingSlashRE = /\/$/
-	function isSameRoute (a       , b        )          {
-	  if (!b) {
+	function isSameRoute (a, b) {
+	  if (b === START) {
+	    return a === b
+	  } else if (!b) {
 	    return false
 	  } else if (a.path && b.path) {
 	    return (
@@ -7857,7 +7911,7 @@
 	  }
 	}
 
-	function isObjectEqual (a, b)          {
+	function isObjectEqual (a, b) {
 	  if ( a === void 0 ) a = {};
 	  if ( b === void 0 ) b = {};
 
@@ -7869,7 +7923,7 @@
 	  return aKeys.every(function (key) { return String(a[key]) === String(b[key]); })
 	}
 
-	function isIncludedRoute (current       , target       )          {
+	function isIncludedRoute (current, target) {
 	  return (
 	    current.path.indexOf(target.path) === 0 &&
 	    (!target.hash || current.hash === target.hash) &&
@@ -7877,7 +7931,7 @@
 	  )
 	}
 
-	function queryIncludes (current            , target            )          {
+	function queryIncludes (current, target) {
 	  for (var key in target) {
 	    if (!(key in current)) {
 	      return false
@@ -7886,14 +7940,14 @@
 	  return true
 	}
 
-	/*       */
+	/*  */
 
 	function normalizeLocation (
-	  raw             ,
-	  current        ,
-	  append          
-	)           {
-	  var next           = typeof raw === 'string' ? { path: raw } : raw
+	  raw,
+	  current,
+	  append
+	) {
+	  var next = typeof raw === 'string' ? { path: raw } : raw
 	  if (next.name || next._normalized) {
 	    return next
 	  }
@@ -7917,10 +7971,10 @@
 	  }
 	}
 
-	/*       */
+	/*  */
 
 	// work around weird flow bug
-	var toTypes                  = [String, Object]
+	var toTypes = [String, Object]
 
 	var Link = {
 	  name: 'router-link',
@@ -7938,7 +7992,7 @@
 	    replace: Boolean,
 	    activeClass: String
 	  },
-	  render: function render (h          ) {
+	  render: function render (h) {
 	    var this$1 = this;
 
 	    var router = this.$router
@@ -7955,27 +8009,30 @@
 	      ? isSameRoute(current, compareTarget)
 	      : isIncludedRoute(current, compareTarget)
 
-	    var data      = {
-	      class: classes,
-	      on: {
-	        click: function (e) {
-	          e.preventDefault()
-	          if (this$1.replace) {
-	            router.replace(to)
-	          } else {
-	            router.push(to)
-	          }
+	    var on = {
+	      click: function (e) {
+	        e.preventDefault()
+	        if (this$1.replace) {
+	          router.replace(to)
+	        } else {
+	          router.push(to)
 	        }
 	      }
 	    }
 
+	    var data = {
+	      class: classes
+	    }
+
 	    if (this.tag === 'a') {
+	      data.on = on
 	      data.attrs = { href: href }
 	    } else {
-	      // find the first <a> child and apply href
+	      // find the first <a> child and apply listener and href
 	      var a = findAnchor(this.$slots.default)
 	      if (a) {
 	        var aData = a.data || (a.data = {})
+	        aData.on = on
 	        var aAttrs = aData.attrs || (aData.attrs = {})
 	        aAttrs.href = href
 	      }
@@ -8001,7 +8058,7 @@
 	}
 
 	function install (Vue) {
-	  if (install.installed) return
+	  if (install.installed) { return }
 	  install.installed = true
 
 	  Object.defineProperty(Vue.prototype, '$router', {
@@ -8026,38 +8083,20 @@
 	  Vue.component('router-link', Link)
 	}
 
-	function interopDefault(ex) {
-		return ex && typeof ex === 'object' && 'default' in ex ? ex['default'] : ex;
-	}
-
-	function createCommonjsModule(fn, module) {
-		return module = { exports: {} }, fn(module, module.exports), module.exports;
-	}
-
-	var index$1 = createCommonjsModule(function (module) {
-	module.exports = Array.isArray || function (arr) {
+	var __moduleExports = Array.isArray || function (arr) {
 	  return Object.prototype.toString.call(arr) == '[object Array]';
 	};
-	});
 
-	var index$2 = interopDefault(index$1);
-
-
-	var require$$0 = Object.freeze({
-	  default: index$2
-	});
-
-	var index = createCommonjsModule(function (module) {
-	var isarray = interopDefault(require$$0)
+	var isarray = __moduleExports
 
 	/**
 	 * Expose `pathToRegexp`.
 	 */
-	module.exports = pathToRegexp
-	module.exports.parse = parse
-	module.exports.compile = compile
-	module.exports.tokensToFunction = tokensToFunction
-	module.exports.tokensToRegExp = tokensToRegExp
+	var index = pathToRegexp
+	var parse_1 = parse
+	var compile_1 = compile
+	var tokensToFunction_1 = tokensToFunction
+	var tokensToRegExp_1 = tokensToRegExp
 
 	/**
 	 * The main path matching regexp utility.
@@ -8474,18 +8513,17 @@
 
 	  return stringToRegexp(/** @type {string} */ (path), /** @type {!Array} */ (keys), options)
 	}
-	});
 
-	var Regexp = interopDefault(index);
+	index.parse = parse_1;
+	index.compile = compile_1;
+	index.tokensToFunction = tokensToFunction_1;
+	index.tokensToRegExp = tokensToRegExp_1;
 
-	/*       */
+	/*  */
 
-	function createRouteMap (routes                    )   
-	                    
-	                   
-	  {
-	  var pathMap           = Object.create(null)
-	  var nameMap           = Object.create(null)
+	function createRouteMap (routes) {
+	  var pathMap = Object.create(null)
+	  var nameMap = Object.create(null)
 
 	  routes.forEach(function (route) {
 	    addRouteRecord(pathMap, nameMap, route)
@@ -8498,17 +8536,17 @@
 	}
 
 	function addRouteRecord (
-	  pathMap          ,
-	  nameMap          ,
-	  route             ,
-	  parent              ,
-	  matchAs         
+	  pathMap,
+	  nameMap,
+	  route,
+	  parent,
+	  matchAs
 	) {
 	  var path = route.path;
 	  var name = route.name;
 	  assert(path != null, "\"path\" is required in a route configuration.")
 
-	  var record              = {
+	  var record = {
 	    path: normalizePath(path, parent),
 	    components: route.components || { default: route.component },
 	    instances: {},
@@ -8541,39 +8579,32 @@
 	  }
 
 	  pathMap[record.path] = record
-	  if (name) nameMap[name] = record
+	  if (name) { nameMap[name] = record }
 	}
 
-	function normalizePath (path        , parent              )         {
+	function normalizePath (path, parent) {
 	  path = path.replace(/\/$/, '')
-	  if (path[0] === '/') return path
-	  if (parent == null) return path
+	  if (path[0] === '/') { return path }
+	  if (parent == null) { return path }
 	  return cleanPath(((parent.path) + "/" + path))
 	}
 
-	/*       */
+	/*  */
 
-	var regexpCache   
-	                  
-	                                   
-	                  
-	   
-	  = Object.create(null)
+	var regexpCache = Object.create(null)
 
-	var regexpCompileCache   
-	                         
-	  = Object.create(null)
+	var regexpCompileCache = Object.create(null)
 
-	function createMatcher (routes                    )          {
+	function createMatcher (routes) {
 	  var ref = createRouteMap(routes);
 	  var pathMap = ref.pathMap;
 	  var nameMap = ref.nameMap;
 
 	  function match (
-	    raw             ,
-	    currentRoute        ,
-	    redirectedFrom           
-	  )        {
+	    raw,
+	    currentRoute,
+	    redirectedFrom
+	  ) {
 	    var location = normalizeLocation(raw, currentRoute)
 	    var name = location.name;
 
@@ -8596,9 +8627,9 @@
 	  }
 
 	  function redirect (
-	    record             ,
-	    location          
-	  )        {
+	    record,
+	    location
+	  ) {
 	    var originalRedirect = record.redirect
 	    var redirect = typeof originalRedirect === 'function'
 	        ? originalRedirect(createRoute(record, location))
@@ -8613,7 +8644,7 @@
 	      return _createRoute(null, location)
 	    }
 
-	    var re         = redirect
+	    var re = redirect
 	    var name = re.name;
 	    var path = re.path;
 	    var query = location.query;
@@ -8653,10 +8684,10 @@
 	  }
 
 	  function alias (
-	    record             ,
-	    location          ,
-	    matchAs        
-	  )        {
+	    record,
+	    location,
+	    matchAs
+	  ) {
 	    var aliasedPath = fillParams(matchAs, location.params, ("aliased route with path \"" + matchAs + "\""))
 	    var aliasedMatch = match({
 	      _normalized: true,
@@ -8672,10 +8703,10 @@
 	  }
 
 	  function _createRoute (
-	    record              ,
-	    location          ,
-	    redirectedFrom           
-	  )        {
+	    record,
+	    location,
+	    redirectedFrom
+	  ) {
 	    if (record && record.redirect) {
 	      return redirect(record, redirectedFrom || location)
 	    }
@@ -8689,10 +8720,10 @@
 	}
 
 	function matchRoute (
-	  path        ,
-	  params        ,
-	  pathname        
-	)          {
+	  path,
+	  params,
+	  pathname
+	) {
 	  var keys, regexp
 	  var hit = regexpCache[path]
 	  if (hit) {
@@ -8700,7 +8731,7 @@
 	    regexp = hit.regexp
 	  } else {
 	    keys = []
-	    regexp = Regexp(path, keys)
+	    regexp = index(path, keys)
 	    regexpCache[path] = { keys: keys, regexp: regexp }
 	  }
 	  var m = pathname.match(regexp)
@@ -8714,21 +8745,21 @@
 	  for (var i = 1, len = m.length; i < len; ++i) {
 	    var key = keys[i - 1]
 	    var val = typeof m[i] === 'string' ? decodeURIComponent(m[i]) : m[i]
-	    if (key) params[key.name] = val
+	    if (key) { params[key.name] = val }
 	  }
 
 	  return true
 	}
 
 	function fillParams (
-	  path        ,
-	  params         ,
-	  routeMsg        
-	)         {
+	  path,
+	  params,
+	  routeMsg
+	) {
 	  try {
 	    var filler =
 	      regexpCompileCache[path] ||
-	      (regexpCompileCache[path] = Regexp.compile(path))
+	      (regexpCompileCache[path] = index.compile(path))
 	    return filler(params || {}, { pretty: true })
 	  } catch (e) {
 	    assert(false, ("missing param for " + routeMsg + ": " + (e.message)))
@@ -8736,11 +8767,11 @@
 	  }
 	}
 
-	function resolveRecordPath (path        , record             )         {
+	function resolveRecordPath (path, record) {
 	  return resolvePath(path, record.parent ? record.parent.path : '/', true)
 	}
 
-	/*       */
+	/*  */
 
 	var inBrowser = typeof window !== 'undefined'
 
@@ -8759,9 +8790,9 @@
 	  return window.history && 'pushState' in window.history
 	})()
 
-	/*       */
+	/*  */
 
-	function runQueue (queue            , fn          , cb          ) {
+	function runQueue (queue, fn, cb) {
 	  var step = function (index) {
 	    if (index >= queue.length) {
 	      cb()
@@ -8778,37 +8809,38 @@
 	  step(0)
 	}
 
-	/*       */
+	/*  */
 
-	                                     
-	var History = function History (router         , base       ) {
+
+	var History = function History (router, base) {
 	  this.router = router
 	  this.base = normalizeBase(base)
 	  // start with a route object that stands for "nowhere"
-	  this.current = createRoute(null, {
-	    path: '__vue_router_init__'
-	  })
+	  this.current = START
 	  this.pending = null
 	};
 
-	History.prototype.listen = function listen (cb        ) {
+	History.prototype.listen = function listen (cb) {
 	  this.cb = cb
 	};
 
-	History.prototype.transitionTo = function transitionTo (location           , cb         ) {
+	History.prototype.transitionTo = function transitionTo (location, cb) {
 	    var this$1 = this;
 
 	  var route = this.router.match(location, this.current)
 	  this.confirmTransition(route, function () {
 	    this$1.updateRoute(route)
 	    cb && cb(route)
+	    this$1.ensureURL()
 	  })
 	};
 
-	History.prototype.confirmTransition = function confirmTransition (route     , cb        ) {
+	History.prototype.confirmTransition = function confirmTransition (route, cb) {
 	    var this$1 = this;
 
-	  if (isSameRoute(route, this.current)) {
+	  var current = this.current
+	  if (isSameRoute(route, current)) {
+	    this.ensureURL()
 	    return
 	  }
 
@@ -8828,15 +8860,28 @@
 	  )
 
 	  this.pending = route
-	  var redirect = function (location) { return this$1.push(location); }
-	  var iterator = function (hook, next) { return hook(route, redirect, next); }
+	  var iterator = function (hook, next) {
+	    if (this$1.pending !== route) { return }
+	    hook(route, current, function (to) {
+	      if (to === false) {
+	        // next(false) -> abort navigation, ensure current URL
+	        this$1.ensureURL()
+	      } else if (typeof to === 'string' || typeof to === 'object') {
+	        // next('/') or next({ path: '/' }) -> redirect
+	        this$1.push(to)
+	      } else {
+	        // confirm transition and pass on the value
+	        next(to)
+	      }
+	    })
+	  }
 
 	  runQueue(queue, iterator, function () {
 	    var postEnterCbs = []
 	    // wait until async components are resolved before
 	    // extracting in-component enter guards
 	    runQueue(extractEnterGuards(activated, postEnterCbs), iterator, function () {
-	      if (isSameRoute(route, this$1.pending)) {
+	      if (this$1.pending === route) {
 	        this$1.pending = null
 	        cb(route)
 	        this$1.router.app.$nextTick(function () {
@@ -8847,15 +8892,16 @@
 	  })
 	};
 
-	History.prototype.updateRoute = function updateRoute (route     ) {
+	History.prototype.updateRoute = function updateRoute (route) {
+	  var prev = this.current
 	  this.current = route
 	  this.cb && this.cb(route)
 	  this.router.afterHooks.forEach(function (hook) {
-	    hook && hook(route)
+	    hook && hook(route, prev)
 	  })
 	};
 
-	function normalizeBase (base         )         {
+	function normalizeBase (base) {
 	  if (!base) {
 	    if (inBrowser) {
 	      // respect <base> tag
@@ -8874,12 +8920,9 @@
 	}
 
 	function resolveQueue (
-	  current                    ,
-	  next                    
-	)   
-	                                
-	                                 
-	  {
+	  current,
+	  next
+	) {
 	  var i
 	  var max = Math.max(current.length, next.length)
 	  for (i = 0; i < max; i++) {
@@ -8893,7 +8936,7 @@
 	  }
 	}
 
-	function extractLeaveGuards (matched                    )                   {
+	function extractLeaveGuards (matched) {
 	  return flatMapComponents(matched, function (def, instance) {
 	    var guard = def && def.beforeRouteLeave
 	    if (guard) {
@@ -8904,23 +8947,25 @@
 	  }).reverse()
 	}
 
-	function extractEnterGuards (matched                    , cbs                 )                   {
+	function extractEnterGuards (matched, cbs) {
 	  return flatMapComponents(matched, function (def, _, match, key) {
 	    var guard = def && def.beforeRouteEnter
 	    if (guard) {
-	      return function routeEnterGuard (route, redirect, next) {
-	        return guard(route, redirect, function (cb) {
-	          next()
-	          cb && cbs.push(function () {
-	            cb(match.instances[key])
-	          })
+	      return function routeEnterGuard (to, from, next) {
+	        return guard(to, from, function (cb) {
+	          next(cb)
+	          if (typeof cb === 'function') {
+	            cbs.push(function () {
+	              cb(match.instances[key])
+	            })
+	          }
 	        })
 	      }
 	    }
 	  })
 	}
 
-	function resolveAsyncComponents (matched                    )                   {
+	function resolveAsyncComponents (matched) {
 	  return flatMapComponents(matched, function (def, _, match, key) {
 	    // if it's a function and doesn't have Vue options attached,
 	    // assume it's an async component resolve function.
@@ -8928,7 +8973,7 @@
 	    // we want to halt the navigation until the incoming component has been
 	    // resolved.
 	    if (typeof def === 'function' && !def.options) {
-	      return function (route, redirect, next) {
+	      return function (to, from, next) {
 	        var resolve = function (resolvedDef) {
 	          match.components[key] = resolvedDef
 	          next()
@@ -8936,6 +8981,7 @@
 
 	        var reject = function (reason) {
 	          warn(false, ("Failed to resolve async component " + key + ": " + reason))
+	          next(false)
 	        }
 
 	        var res = def(resolve, reject)
@@ -8948,9 +8994,9 @@
 	}
 
 	function flatMapComponents (
-	  matched                    ,
-	  fn          
-	)                   {
+	  matched,
+	  fn
+	) {
 	  return Array.prototype.concat.apply([], matched.map(function (m) {
 	    return Object.keys(m.components).map(function (key) { return fn(
 	      m.components[key],
@@ -8960,22 +9006,22 @@
 	  }))
 	}
 
-	/*       */
+	/*  */
 
-	function saveScrollPosition (key        ) {
-	  if (!key) return
+	function saveScrollPosition (key) {
+	  if (!key) { return }
 	  window.sessionStorage.setItem(key, JSON.stringify({
 	    x: window.pageXOffset,
 	    y: window.pageYOffset
 	  }))
 	}
 
-	function getScrollPosition (key        )          {
-	  if (!key) return
+	function getScrollPosition (key) {
+	  if (!key) { return }
 	  return JSON.parse(window.sessionStorage.getItem(key))
 	}
 
-	function getElementPosition (el         )         {
+	function getElementPosition (el) {
 	  var docRect = document.documentElement.getBoundingClientRect()
 	  var elRect = el.getBoundingClientRect()
 	  return {
@@ -8984,41 +9030,34 @@
 	  }
 	}
 
-	function isValidPosition (obj        )          {
+	function isValidPosition (obj) {
 	  return isNumber(obj.x) || isNumber(obj.y)
 	}
 
-	function normalizePosition (obj        )         {
+	function normalizePosition (obj) {
 	  return {
 	    x: isNumber(obj.x) ? obj.x : window.pageXOffset,
 	    y: isNumber(obj.y) ? obj.y : window.pageYOffset
 	  }
 	}
 
-	function isNumber (v     )          {
+	function isNumber (v) {
 	  return typeof v === 'number'
 	}
 
-	/*       */
+	/*  */
 
-	                                     
+
 	var genKey = function () { return String(Date.now()); }
-	var _key         = genKey()
+	var _key = genKey()
 
 	var HTML5History = (function (History) {
-	  function HTML5History (router           , base         ) {
+	  function HTML5History (router, base) {
 	    var this$1 = this;
 
 	    History.call(this, router, base)
 
-	    var initialLocation = getLocation(this.base)
-	    this.transitionTo(initialLocation, function (route) {
-	      // possible redirect on start
-	      var url = cleanPath(this$1.base + this$1.current.fullPath)
-	      if (initialLocation !== url) {
-	        replaceState(url)
-	      }
-	    })
+	    this.transitionTo(getLocation(this.base))
 
 	    var expectScroll = router.options.scrollBehavior
 	    window.addEventListener('popstate', function (e) {
@@ -9042,31 +9081,37 @@
 	  HTML5History.prototype = Object.create( History && History.prototype );
 	  HTML5History.prototype.constructor = HTML5History;
 
-	  HTML5History.prototype.go = function go (n        ) {
+	  HTML5History.prototype.go = function go (n) {
 	    window.history.go(n)
 	  };
 
-	  HTML5History.prototype.push = function push (location             ) {
+	  HTML5History.prototype.push = function push (location) {
 	    var this$1 = this;
 
 	    var current = this.current
-	    History.prototype.transitionTo.call(this, location, function (route) {
+	    this.transitionTo(location, function (route) {
 	      pushState(cleanPath(this$1.base + route.fullPath))
 	      this$1.handleScroll(route, current, false)
 	    })
 	  };
 
-	  HTML5History.prototype.replace = function replace (location             ) {
+	  HTML5History.prototype.replace = function replace (location) {
 	    var this$1 = this;
 
 	    var current = this.current
-	    History.prototype.transitionTo.call(this, location, function (route) {
+	    this.transitionTo(location, function (route) {
 	      replaceState(cleanPath(this$1.base + route.fullPath))
 	      this$1.handleScroll(route, current, false)
 	    })
 	  };
 
-	  HTML5History.prototype.handleScroll = function handleScroll (to       , from       , isPop         ) {
+	  HTML5History.prototype.ensureURL = function ensureURL () {
+	    if (getLocation(this.base) !== this.current.fullPath) {
+	      replaceState(cleanPath(this.base + this.current.fullPath))
+	    }
+	  };
+
+	  HTML5History.prototype.handleScroll = function handleScroll (to, from, isPop) {
 	    var router = this.router
 	    if (!router.app) {
 	      return
@@ -9086,7 +9131,7 @@
 	        return
 	      }
 	      var isObject = typeof shouldScroll === 'object'
-	      if (isObject && shouldScroll.selector) {
+	      if (isObject && typeof shouldScroll.selector === 'string') {
 	        var el = document.querySelector(shouldScroll.selector)
 	        if (el) {
 	          position = getElementPosition(el)
@@ -9106,7 +9151,7 @@
 	  return HTML5History;
 	}(History));
 
-	function getLocation (base        )         {
+	function getLocation (base) {
 	  var path = window.location.pathname
 	  if (base && path.indexOf(base) === 0) {
 	    path = path.slice(base.length)
@@ -9114,7 +9159,7 @@
 	  return (path || '/') + window.location.search + window.location.hash
 	}
 
-	function pushState (url        , replace          ) {
+	function pushState (url, replace) {
 	  // try...catch the pushState call to get around Safari
 	  // DOM Exception 18 where it limits to 100 pushState calls
 	  var history = window.history
@@ -9131,15 +9176,15 @@
 	  }
 	}
 
-	function replaceState (url        ) {
+	function replaceState (url) {
 	  pushState(url, true)
 	}
 
-	/*       */
+	/*  */
 
-	                                     
+
 	var HashHistory = (function (History) {
-	  function HashHistory (router           , base         , fallback         ) {
+	  function HashHistory (router, base, fallback) {
 	    var this$1 = this;
 
 	    History.call(this, router, base)
@@ -9150,12 +9195,7 @@
 	    }
 
 	    ensureSlash()
-	    this.transitionTo(getHash(), function (route) {
-	      // possible redirect on start
-	      if (getHash() !== route.fullPath) {
-	        replaceHash(route.fullPath)
-	      }
-	    })
+	    this.transitionTo(getHash())
 
 	    window.addEventListener('hashchange', function () {
 	      this$1.onHashChange()
@@ -9185,26 +9225,32 @@
 	    })
 	  };
 
-	  HashHistory.prototype.push = function push (location             ) {
+	  HashHistory.prototype.push = function push (location) {
 	    History.prototype.transitionTo.call(this, location, function (route) {
 	      pushHash(route.fullPath)
 	    })
 	  };
 
-	  HashHistory.prototype.replace = function replace (location             ) {
+	  HashHistory.prototype.replace = function replace (location) {
 	    History.prototype.transitionTo.call(this, location, function (route) {
 	      replaceHash(route.fullPath)
 	    })
 	  };
 
-	  HashHistory.prototype.go = function go (n        ) {
+	  HashHistory.prototype.go = function go (n) {
 	    window.history.go(n)
+	  };
+
+	  HashHistory.prototype.ensureURL = function ensureURL () {
+	    if (getHash() !== this.current.fullPath) {
+	      replaceHash(this.current.fullPath)
+	    }
 	  };
 
 	  return HashHistory;
 	}(History));
 
-	function ensureSlash ()          {
+	function ensureSlash () {
 	  var path = getHash()
 	  if (path.charAt(0) === '/') {
 	    return true
@@ -9213,7 +9259,7 @@
 	  return false
 	}
 
-	function getHash ()         {
+	function getHash () {
 	  // We can't use window.location.hash here because it's not
 	  // consistent across browsers - Firefox will pre-decode it!
 	  var href = window.location.href
@@ -9232,11 +9278,11 @@
 	  )
 	}
 
-	/*       */
+	/*  */
 
-	                                     
+
 	var AbstractHistory = (function (History) {
-	  function AbstractHistory (router           ) {
+	  function AbstractHistory (router) {
 	    History.call(this, router)
 	    this.stack = []
 	    this.index = 0
@@ -9246,7 +9292,7 @@
 	  AbstractHistory.prototype = Object.create( History && History.prototype );
 	  AbstractHistory.prototype.constructor = AbstractHistory;
 
-	  AbstractHistory.prototype.push = function push (location             ) {
+	  AbstractHistory.prototype.push = function push (location) {
 	    var this$1 = this;
 
 	    History.prototype.transitionTo.call(this, location, function (route) {
@@ -9255,7 +9301,7 @@
 	    })
 	  };
 
-	  AbstractHistory.prototype.replace = function replace (location             ) {
+	  AbstractHistory.prototype.replace = function replace (location) {
 	    var this$1 = this;
 
 	    History.prototype.transitionTo.call(this, location, function (route) {
@@ -9263,7 +9309,7 @@
 	    })
 	  };
 
-	  AbstractHistory.prototype.go = function go (n        ) {
+	  AbstractHistory.prototype.go = function go (n) {
 	    var this$1 = this;
 
 	    var targetIndex = this.index + n
@@ -9277,13 +9323,17 @@
 	    })
 	  };
 
+	  AbstractHistory.prototype.ensureURL = function ensureURL () {
+	    // noop
+	  };
+
 	  return AbstractHistory;
 	}(History));
 
-	/*       */
+	/*  */
 
 	var VueRouter = function VueRouter (options) {
-	  if ( options === void 0 ) options              = {};
+	  if ( options === void 0 ) options = {};
 
 	  this.app = null
 	  this.options = options
@@ -9304,11 +9354,11 @@
 
 	var prototypeAccessors = { currentRoute: {} };
 
-	prototypeAccessors.currentRoute.get = function ()       {
+	prototypeAccessors.currentRoute.get = function () {
 	  return this.history && this.history.current
 	};
 
-	VueRouter.prototype.init = function init (app    /* Vue component instance */) {
+	VueRouter.prototype.init = function init (app /* Vue component instance */) {
 	    var this$1 = this;
 
 	  assert(
@@ -9342,23 +9392,23 @@
 	  })
 	};
 
-	VueRouter.prototype.beforeEach = function beforeEach (fn        ) {
+	VueRouter.prototype.beforeEach = function beforeEach (fn) {
 	  this.beforeHooks.push(fn)
 	};
 
-	VueRouter.prototype.afterEach = function afterEach (fn        ) {
+	VueRouter.prototype.afterEach = function afterEach (fn) {
 	  this.afterHooks.push(fn)
 	};
 
-	VueRouter.prototype.push = function push (location           ) {
+	VueRouter.prototype.push = function push (location) {
 	  this.history.push(location)
 	};
 
-	VueRouter.prototype.replace = function replace (location           ) {
+	VueRouter.prototype.replace = function replace (location) {
 	  this.history.replace(location)
 	};
 
-	VueRouter.prototype.go = function go (n      ) {
+	VueRouter.prototype.go = function go (n) {
 	  this.history.go(n)
 	};
 
@@ -9370,7 +9420,7 @@
 	  this.go(1)
 	};
 
-	VueRouter.prototype.getMatchedComponents = function getMatchedComponents ()           {
+	VueRouter.prototype.getMatchedComponents = function getMatchedComponents () {
 	  if (!this.currentRoute) {
 	    return []
 	  }
@@ -9413,7 +9463,7 @@
 	  return SCSocketCreator.destroy(options);
 	};
 
-	module.exports.version = '5.0.12';
+	module.exports.version = '5.0.13';
 
 
 /***/ },
@@ -13261,18 +13311,6 @@
 
 	/* WEBPACK VAR INJECTION */(function(global) {var base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-	module.exports.decode = function (input) {
-	  if (input == null) {
-	   return null;
-	  }
-	  var message = input.toString();
-
-	  try {
-	    return JSON.parse(message);
-	  } catch (err) {}
-	  return message;
-	};
-
 	var arrayBufferToBase64 = function (arraybuffer) {
 	  var bytes = new Uint8Array(arraybuffer);
 	  var len = bytes.length;
@@ -13294,48 +13332,63 @@
 	  return base64;
 	};
 
-	var isOwnDescendant = function (object, ancestors) {
-	  return ancestors.indexOf(object) > -1;
-	};
-
-	var convertBuffersToBase64 = function (object, ancestors) {
-	  if (!ancestors) {
-	    ancestors = [];
-	  }
-	  if (isOwnDescendant(object, ancestors)) {
-	    throw new Error('Cannot traverse circular structure');
-	  }
-	  var newAncestors = ancestors.concat([object]);
-
-	  if (global.ArrayBuffer && object instanceof global.ArrayBuffer) {
-	    object = {
+	var binaryToBase64Replacer = function (key, value) {
+	  if (global.ArrayBuffer && value instanceof global.ArrayBuffer) {
+	    return {
 	      base64: true,
-	      data: arrayBufferToBase64(object)
+	      data: arrayBufferToBase64(value)
 	    };
-	  } else if (global.Buffer && object instanceof global.Buffer) {
-	    object = {
-	      base64: true,
-	      data: object.toString('base64')
-	    };
-	  } else if (object instanceof Array) {
-	    for (var i in object) {
-	      if (object.hasOwnProperty(i)) {
-	        object[i] = convertBuffersToBase64(object[i], newAncestors);
-	      }
+	  } else if (global.Buffer) {
+	    if (value instanceof global.Buffer){
+	      return {
+	        base64: true,
+	        data: value.toString('base64')
+	      };
 	    }
-	  } else if (object instanceof Object) {
-	    for (var j in object) {
-	      if (object.hasOwnProperty(j)) {
-	        object[j] = convertBuffersToBase64(object[j], newAncestors);
+	    // Some versions of Node.js convert Buffers to Objects before they are passed to
+	    // the replacer function - Because of this, we need to rehydrate Buffers
+	    // before we can convert them to base64 strings.
+	    if (value && value.type == 'Buffer' && value.data instanceof Array) {
+	      var rehydratedBuffer;
+	      if (global.Buffer.from) {
+	        rehydratedBuffer = global.Buffer.from(value.data);
+	      } else {
+	        rehydratedBuffer = new global.Buffer(value.data);
 	      }
+	      return {
+	        base64: true,
+	        data: rehydratedBuffer.toString('base64')
+	      };
 	    }
 	  }
-	  return object;
+	  return value;
 	};
 
+	// Decode the data which was transmitted over the wire to a JavaScript Object in a format which SC understands.
+	// See encode function below for more details.
+	module.exports.decode = function (input) {
+	  if (input == null) {
+	   return null;
+	  }
+	  var message = input.toString();
+
+	  try {
+	    return JSON.parse(message);
+	  } catch (err) {}
+	  return message;
+	};
+
+
+	// Encode a raw JavaScript object (which is in the SC protocol format) into a format for
+	// transfering it over the wire. In this case, we just convert it into a simple JSON string.
+	// If you want to create your own custom codec, you can encode the object into any format
+	// (e.g. binary ArrayBuffer or string with any kind of compression) so long as your decode
+	// function is able to rehydrate that object back into its original JavaScript Object format
+	// (which adheres to the SC protocol).
+	// See https://github.com/SocketCluster/socketcluster/blob/master/socketcluster-protocol.md
+	// for details about the SC protocol.
 	module.exports.encode = function (object) {
-	  var base64Object = convertBuffersToBase64(object);
-	  return JSON.stringify(base64Object);
+	  return JSON.stringify(object, binaryToBase64Replacer);
 	};
 
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
@@ -14579,6 +14632,7 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var __vue_script__, __vue_template__
+	var __vue_styles__ = {}
 	__vue_script__ = __webpack_require__(29)
 	if (__vue_script__ &&
 	    __vue_script__.__esModule &&
@@ -14586,9 +14640,15 @@
 	  console.warn("[vue-loader] public/js/config/routes.vue: named exports in *.vue files are ignored.")}
 	module.exports = __vue_script__ || {}
 	if (module.exports.__esModule) module.exports = module.exports.default
+	var __vue_options__ = typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports
 	if (__vue_template__) {
-	(typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports).template = __vue_template__
+	__vue_options__.template = __vue_template__
 	}
+	if (!__vue_options__.computed) __vue_options__.computed = {}
+	Object.keys(__vue_styles__).forEach(function (key) {
+	var module = __vue_styles__[key]
+	__vue_options__.computed[key] = function () { return module }
+	})
 	if (false) {(function () {  module.hot.accept()
 	  var hotAPI = require("vue-hot-reload-api")
 	  hotAPI.install(require("vue"), false)
@@ -14642,6 +14702,7 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var __vue_script__, __vue_template__
+	var __vue_styles__ = {}
 	__webpack_require__(31)
 	__vue_script__ = __webpack_require__(35)
 	if (__vue_script__ &&
@@ -14650,9 +14711,15 @@
 	  console.warn("[vue-loader] public/js/src/dashboard/index.vue: named exports in *.vue files are ignored.")}
 	module.exports = __vue_script__ || {}
 	if (module.exports.__esModule) module.exports = module.exports.default
+	var __vue_options__ = typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports
 	if (__vue_template__) {
-	(typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports).template = __vue_template__
+	__vue_options__.template = __vue_template__
 	}
+	if (!__vue_options__.computed) __vue_options__.computed = {}
+	Object.keys(__vue_styles__).forEach(function (key) {
+	var module = __vue_styles__[key]
+	__vue_options__.computed[key] = function () { return module }
+	})
 	if (false) {(function () {  module.hot.accept()
 	  var hotAPI = require("vue-hot-reload-api")
 	  hotAPI.install(require("vue"), false)
@@ -15007,6 +15074,7 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var __vue_script__, __vue_template__
+	var __vue_styles__ = {}
 	__webpack_require__(37)
 	__vue_script__ = __webpack_require__(39)
 	if (__vue_script__ &&
@@ -15015,9 +15083,15 @@
 	  console.warn("[vue-loader] public/js/src/session/index.vue: named exports in *.vue files are ignored.")}
 	module.exports = __vue_script__ || {}
 	if (module.exports.__esModule) module.exports = module.exports.default
+	var __vue_options__ = typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports
 	if (__vue_template__) {
-	(typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports).template = __vue_template__
+	__vue_options__.template = __vue_template__
 	}
+	if (!__vue_options__.computed) __vue_options__.computed = {}
+	Object.keys(__vue_styles__).forEach(function (key) {
+	var module = __vue_styles__[key]
+	__vue_options__.computed[key] = function () { return module }
+	})
 	if (false) {(function () {  module.hot.accept()
 	  var hotAPI = require("vue-hot-reload-api")
 	  hotAPI.install(require("vue"), false)
@@ -15094,6 +15168,7 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var __vue_script__, __vue_template__
+	var __vue_styles__ = {}
 	__webpack_require__(41)
 	__vue_script__ = __webpack_require__(43)
 	if (__vue_script__ &&
@@ -15102,9 +15177,15 @@
 	  console.warn("[vue-loader] public/js/src/session/create.vue: named exports in *.vue files are ignored.")}
 	module.exports = __vue_script__ || {}
 	if (module.exports.__esModule) module.exports = module.exports.default
+	var __vue_options__ = typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports
 	if (__vue_template__) {
-	(typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports).template = __vue_template__
+	__vue_options__.template = __vue_template__
 	}
+	if (!__vue_options__.computed) __vue_options__.computed = {}
+	Object.keys(__vue_styles__).forEach(function (key) {
+	var module = __vue_styles__[key]
+	__vue_options__.computed[key] = function () { return module }
+	})
 	if (false) {(function () {  module.hot.accept()
 	  var hotAPI = require("vue-hot-reload-api")
 	  hotAPI.install(require("vue"), false)
@@ -15212,6 +15293,7 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var __vue_script__, __vue_template__
+	var __vue_styles__ = {}
 	__webpack_require__(45)
 	__vue_script__ = __webpack_require__(47)
 	if (__vue_script__ &&
@@ -15220,9 +15302,15 @@
 	  console.warn("[vue-loader] public/js/src/session/destroy.vue: named exports in *.vue files are ignored.")}
 	module.exports = __vue_script__ || {}
 	if (module.exports.__esModule) module.exports = module.exports.default
+	var __vue_options__ = typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports
 	if (__vue_template__) {
-	(typeof module.exports === "function" ? (module.exports.options || (module.exports.options = {})) : module.exports).template = __vue_template__
+	__vue_options__.template = __vue_template__
 	}
+	if (!__vue_options__.computed) __vue_options__.computed = {}
+	Object.keys(__vue_styles__).forEach(function (key) {
+	var module = __vue_styles__[key]
+	__vue_options__.computed[key] = function () { return module }
+	})
 	if (false) {(function () {  module.hot.accept()
 	  var hotAPI = require("vue-hot-reload-api")
 	  hotAPI.install(require("vue"), false)
