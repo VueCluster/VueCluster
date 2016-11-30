@@ -6,6 +6,7 @@ Complete documentation available at: http://vue-cluster.com/
 ### This is a project in it's initial stage. I could really use some feedback if anyone has some time. Thanks!
 
 ## Change log
+	- 1.1.0 Removed the puglatizer package and am just using vue2 templates
 
 	- 1.0.2 VueRouter 2 broke the build so I'm pushing up the change to fix it.
 
@@ -13,7 +14,7 @@ Complete documentation available at: http://vue-cluster.com/
 
 ## Introduction
 
-VueCluster is a Server-Less,fully clustered (horizontal and vertical), full framework based on Vue2, Vue-router2, Socketcluster, and SC-CRUD-MySQL, and the blazing fast client-side templating engine, Puglatizer. The goal is to build a full framework that provides UNLIMITED scaling, high speed, redundency, and no server management. After the initial mysql setup, there should almost no need for any server code unless you want some kind of API which we provide Express routes for endpoints.
+VueCluster is a Server-Less,fully clustered (horizontal and vertical), full framework based on Vue2, Vue-router2, Socketcluster, and SC-CRUD-MySQL. The goal is to build a full framework that provides UNLIMITED scaling, high speed, redundency, and no server management. After the initial mysql setup, there should almost no need for any server code unless you want some kind of API which we provide Express routes for endpoints.
 
 NOTE: While MySQL is the preferred database for VueCluster, you can pass in ANY database connection into the worker as long as it uses .query for querying. You can write a wrapper to match this and pass that in if your preferred database doesn't match that pattern. Thanks!
 
@@ -30,8 +31,6 @@ VueCluster provides so many features to speed up your app, it's hard to put all 
 4) Vue2-router (http://router.vuejs.org/en/index.html)
 
 5) Bootstrap 4 (http://v4-alpha.getbootstrap.com/)
-
-6) Puglatizer: Client-side templating engine based on Pug (formally Jade) (https://www.npmjs.com/package/puglatizer)
 
 ## Main Contributors
 
@@ -85,3 +84,7 @@ This file provides access to you vue routes. You can alter these routes just lik
 2) Pages
 
 All pages are altered in the ```public/js/src``` folder. You can add any new pages here just make sure you register them in your router.vue file. For more information on how to build more complex pages, please refer to the documentation on the website.
+
+## TODO
+
+	- Add hot-reload for socketcluster
